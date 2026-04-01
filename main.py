@@ -10,27 +10,60 @@ longpoll = VkBotLongPoll(vk_session, config.vk_bot_group_id)
 
 gpt = GPTTunnel(config.gpttoken)
 
+def is_triggered(msg) -> bool:
+    is_conversation = msg.conversation_message_id
+    if not is_conversation:
+        return False
+
+    if len(config.triggers) == 0:
+        return True
+
+    if any(trigger.lower() in msg.text.lower() for trigger in config.triggers):
+        return True
+
+    if not config.is_trigger_on_reply:
+        return False
+
+    reply = msg.get('reply_message')
+        
+    if reply:
+        is_reply_to_bot = (reply['from_id'] == -config.vk_bot_group_id)
+        if is_reply_to_bot:
+            return True
+
+    return False
+
+# сделать кэш
+def get_user_name(user_id):
+    try:
+        user_info = vk.users.get(user_ids=user_id)[0] 
+        first_name = user_info['first_name']
+        last_name = user_info['last_name']
+        return f"{first_name} {last_name}"
+    except Exception as e:
+        return ""
+
 while True:
     try:
         for event in longpoll.listen():
             if event.type == VkBotEventType.MESSAGE_NEW:
                 msg = event.message
 
-                print(msg)
 
                 try:
-                    is_conversation = msg.conversation_message_id
-                    if not is_conversation:
+                    if not is_triggered(msg):
                         continue
 
-                    if not any(trigger.lower() in msg.text.lower() for trigger in config.triggers):
-                        continue
+                    vk.messages.setActivity(
+                        type='typing', 
+                        peer_id=msg.peer_id, 
+                        group_id=config.vk_bot_group_id
+                    )
 
-                    # if (config.peer_ids 
-                    #     and len(config.peer_ids) != 0 
-                    #     and msg.peer_id not in config.peer_ids):
-                    #     continue
-                    result = gpt.askAssistant('mdpakhmurin-assistant-ai6495591', 'ai6495591', msg.text)
+                    user_id = msg.from_id
+                    user_name = get_user_name(user_id)
+
+                    result = gpt.askAssistant('mdpakhmurin-assistant-ai6495591', 'ai6495591', msg.text + "\n" + "отправитель:" + user_name)
                     raw_answer: str = result["message"]
 
                     vk.messages.send(
@@ -45,5 +78,5 @@ while True:
 
     except Exception as e:
         print(datetime.now(), "\t", "Unexpected error:", e)
-        time.sleep(30)
+        time.sleep(20)
         continue
