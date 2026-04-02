@@ -3,6 +3,7 @@ from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 import config
 from gptunnel import GPTTunnel
 from datetime import datetime
+import utils
 
 vk_session = vk_api.VkApi(token=config.vk_token)
 vk = vk_session.get_api()
@@ -33,16 +34,6 @@ def is_triggered(msg) -> bool:
 
     return False
 
-# сделать кэш
-def get_user_name(user_id):
-    try:
-        user_info = vk.users.get(user_ids=user_id)[0] 
-        first_name = user_info['first_name']
-        last_name = user_info['last_name']
-        return f"{first_name} {last_name}"
-    except Exception as e:
-        return ""
-
 while True:
     try:
         for event in longpoll.listen():
@@ -54,6 +45,7 @@ while True:
                     if not is_triggered(msg):
                         continue
 
+                    # подпись 'печатает...'
                     vk.messages.setActivity(
                         type='typing', 
                         peer_id=msg.peer_id, 
@@ -61,7 +53,7 @@ while True:
                     )
 
                     user_id = msg.from_id
-                    user_name = get_user_name(user_id)
+                    user_name = utils.get_user_name(vk, user_id)
 
                     result = gpt.askAssistant('mdpakhmurin-assistant-ai6495591', 'ai6495591', msg.text + "\n" + "отправитель:" + user_name)
                     raw_answer: str = result["message"]
